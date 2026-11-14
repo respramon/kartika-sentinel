@@ -4,12 +4,18 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ICON = { cloud: '🌐', firewall: '🛡️', server: '🖥️', sentinel: '🦅', workstation: '💻', ap: '📶', plc: '⚙️', ups: '🔋', nvr: '📼', camera: '📹', access: '🚪', radio: '📻' };
 
-let MODEL = null, eng, simT, queue, running, blockedCount, selInc = null, lastRender = 0, flows = [];
+const RULE_ICON = { BRUTE_FORCE: '🔑', BF_SUCCESS: '🔓', PORT_SCAN: '📡', MODBUS_WRITE: '⚙️', MODBUS_RECON: '🔍', OT_IMPACT: '⚡', MAL_DOC: '📄', DNS_TUNNEL: '🕳️',
+  C2_BEACON: '📶', IOC_MATCH: '☠️', IOC_SCAN: '☠️', LATERAL_SMB: '↔️', RANSOMWARE: '🔐', DDOS_OUT: '🌊', ROGUE_DEVICE: '📱', ARP_SPOOF: '🎭', AI: '🧠' };
+const HUBS = { it: { id: 'SW-IT', x: 440, y: 145 }, ot: { id: 'SW-OT', x: 700, y: 145 } };
+
+let MODEL = null, eng, simT, prevSimT, lastTickPerf = 0, queue, running, blockedCount, selInc = null, lastRender = 0, flows = [], scenTotal = {};
+let hist = { epm: [], post: [], al: [] };
 const S = { speed: 2 };
 
 function reset() {
   eng = new DetectionEngine({ model: MODEL, onAlert });
-  simT = 0; queue = []; running = new Set(); blockedCount = 0; selInc = null; flows = [];
+  simT = 0; prevSimT = 0; queue = []; running = new Set(); blockedCount = 0; selInc = null; flows = []; scenTotal = {}; hist = { epm: [], post: [], al: [] };
+  renderTopoStatic();
   $('#feed').innerHTML = '<div class="empty">Belum ada ancaman. Jalankan skenario latihan di bawah untuk menguji deteksi.</div>';
   $('#evlog').innerHTML = ''; renderAll(true);
 }
@@ -26,15 +32,15 @@ function tick() {
     if (e.src !== e.dst) flows.push({ e, until: t1 + 1.5 });
     logEvent(e);
   }
-  simT = t1; eng.windowTick(simT);
-  flows = flows.filter(f => f.until > simT).slice(-60);
+  prevSimT = simT; simT = t1; lastTickPerf = performance.now(); eng.windowTick(simT);
+  flows = flows.filter(f => f.until > simT).slice(-70);
   for (const id of [...running]) if (!queue.some(e => e.scen === id)) { running.delete(id); }
-  renderTopo(); renderClock();
+  renderClock();
   if (performance.now() - lastRender > 600) { renderAll(); lastRender = performance.now(); }
 }
 function runScenario(id) {
   const sc = SCENARIOS.find(s => s.id === id); if (running.has(id)) return;
-  const evs = sc.build(simT + 0.5); evs.forEach(e => e.scen = id);
+  const evs = sc.build(simT + 0.5); evs.forEach(e => e.scen = id); scenTotal[id] = evs.length;
   queue.push(...evs); queue.sort((a, b) => a.ts - b.ts); running.add(id); renderScen();
 }
 
@@ -49,10 +55,10 @@ function onAlert(a) {
   }
 }
 function alertHtml(a) {
-  const v = SEV[a.sev];
-  return `<div class="al v${v}"><div class="m"><span class="sev s${v}">${SEV_LABEL[v]}</span><span class="time">${wib(a.ts)}</span><span class="time">${a.id} · ${a.incident || ''}</span></div>
+  const v = SEV[a.sev]; const isAI = a.rule.startsWith('AI_');
+  return `<div class="al v${v}"><span class="aic">${RULE_ICON[isAI ? 'AI' : a.rule] || '•'}</span><div class="m"><span class="sev s${v}">${SEV_LABEL[v]}</span><span class="time">${wib(a.ts)}</span><span class="time">${a.id} · ${a.incident || ''}</span></div>
   <div class="t">${esc(a.title)}</div><div class="d">${esc(a.detail)}</div>
-  <div class="m">${a.techs.map(t => `<span class="tt ${MITRE[t].dom === 'ICS' ? 'ics' : ''}" title="${esc(MITRE[t].name)}">${t}</span>`).join('')}${a.rule === 'AI_ANOMALY' ? '<span class="tt">AI · Isolation Forest</span>' : ''}</div></div>`;
+  <div class="m">${a.techs.map(t => `<span class="tt ${MITRE[t].dom === 'ICS' ? 'ics' : ''}" title="${esc(MITRE[t].name)}">${t}</span>`).join('')}${isAI ? '<span class="tt ai">AI · Isolation Forest</span>' : ''}</div></div>`;
 }
 function toast(html) {
   const d = document.createElement('div'); d.className = 'toast'; d.innerHTML = html; $('#toasts').appendChild(d);
@@ -103,47 +109,105 @@ function autoRespond(a) {
 /* ---------- render ---------- */
 function renderClock() { $('#clock').textContent = wib(simT, false) + ' WIB · sim'; }
 function renderAll(force) {
-  renderKpi(); renderIncList(); renderIncDetail(); renderMatrix(); renderAssets(); renderReportSel(); renderScen();
+  renderKpi(); renderNodes(); renderIncList(); renderIncDetail(); renderMatrix(); renderAssets(); renderReportSel(); renderScen();
+}
+const riskCol = r => r >= 70 ? 'var(--crit)' : r >= 45 ? 'var(--high)' : r >= 30 ? 'var(--med)' : 'var(--ok)';
+function spark(id, arr, color, fixedMax) {
+  const c = $(id); if (!c) return; const x = c.getContext('2d'), W = c.width, H = c.height; x.clearRect(0, 0, W, H);
+  if (arr.length < 2) return; const mx = fixedMax || Math.max(1, ...arr) * 1.15;
+  const pts = arr.map((v, i) => [i * W / (arr.length - 1), H - 2 - (v / mx) * (H - 6)]);
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, color + '55'); g.addColorStop(1, color + '00');
+  x.beginPath(); x.moveTo(0, H); pts.forEach(p => x.lineTo(p[0], p[1])); x.lineTo(W, H); x.fillStyle = g; x.fill();
+  x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.strokeStyle = color; x.lineWidth = 1.6; x.stroke();
+  const l = pts[pts.length - 1]; x.beginPath(); x.arc(l[0] - 2, l[1], 2.5, 0, 7); x.fillStyle = color; x.fill();
 }
 function renderKpi() {
   const p = eng.posture(); $('#kPosture').textContent = p;
   $('#kPostureTxt').textContent = p >= 80 ? 'SIAGA NORMAL' : p >= 60 ? 'WASPADA' : p >= 40 ? 'SIAGA II — ancaman aktif' : 'SIAGA I — serangan kritis';
   const col = p >= 80 ? 'var(--ok)' : p >= 60 ? 'var(--med)' : p >= 40 ? 'var(--high)' : 'var(--crit)';
+  const hex = p >= 80 ? '#35d07f' : p >= 60 ? '#f0b429' : p >= 40 ? '#ff7a45' : '#ff3b5c';
   $('#kPosture').style.color = col;
+  $('#threat').style.setProperty('--tc', col); $('#threatTxt').textContent = p >= 80 ? 'SIAGA NORMAL' : p >= 60 ? 'WASPADA' : p >= 40 ? 'SIAGA II' : 'SIAGA I';
   const C = 2 * Math.PI * 30;
-  $('#gauge').innerHTML = `<svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="30" fill="none" stroke="#1f2a22" stroke-width="8"/><circle cx="37" cy="37" r="30" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C * p / 100} ${C}" transform="rotate(-90 37 37)"/></svg>`;
+  $('#gauge').innerHTML = `<svg viewBox="0 0 74 74"><defs><filter id="gl"><feGaussianBlur stdDeviation="2.2"/></filter></defs><circle cx="37" cy="37" r="30" fill="none" stroke="#1c2920" stroke-width="7"/>
+    <circle cx="37" cy="37" r="30" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C * p / 100} ${C}" transform="rotate(-90 37 37)" filter="url(#gl)" opacity=".6"/>
+    <circle cx="37" cy="37" r="30" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C * p / 100} ${C}" transform="rotate(-90 37 37)"/>
+    <text x="37" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="${col}" font-family="Bahnschrift,Segoe UI">${p}%</text></svg>`;
   const real = ASSETS.filter(a => a.id !== 'INET');
   $('#kAssets').textContent = real.length; $('#kIt').textContent = real.filter(a => a.zone !== 'ot').length; $('#kOt').textContent = real.filter(a => a.zone === 'ot').length;
+  $('#kZones').innerHTML = ['dmz', 'it', 'ot'].map(z => { const r = Math.max(...real.filter(a => a.zone === z).map(a => eng.assetRisk(a.id)));
+    return `<i title="${ZONES[z].name}: risiko maks ${r}" style="background:${riskCol(r)}"></i>`; }).join('');
   const span = Math.max(1, Math.min(60, simT));
-  $('#kEpm').textContent = Math.round(eng.events.filter(e => e.ts > simT - span).length * 60 / span);
+  const epm = Math.round(eng.events.filter(e => e.ts > simT - span).length * 60 / span);
+  $('#kEpm').textContent = epm;
+  const alRate = eng.alerts.filter(a => a.ts > simT - 20).length;
+  hist.epm.push(epm); hist.post.push(p); hist.al.push(alRate);
+  for (const k in hist) if (hist[k].length > 90) hist[k].shift();
+  spark('#spEpm', hist.epm, '#4aa3ff'); spark('#spPost', hist.post, hex, 100); spark('#spAl', hist.al, '#ff3b5c');
+  $('#kIso').textContent = `${eng.isolated.size} host diisolasi${eng.plcLocked ? ' · PLC terkunci' : ''}`;
   const act = eng.incidents.filter(i => i.status === 'Aktif'); $('#kInc').textContent = act.length;
   $('#kInc').style.color = act.length ? 'var(--crit)' : 'var(--ok)';
   $('#kIncS').textContent = act.length ? `${act.filter(i => i.sev >= 4).length} kritis · ${act.filter(i => i.ot).length} melibatkan OT` : 'aman';
   $('#kBlk').textContent = blockedCount; $('#incBadge').textContent = act.length; $('#incBadge').style.display = act.length ? '' : 'none';
   $('#alertCount').textContent = eng.alerts.length + ' peringatan';
 }
-function renderTopo() {
-  const svg = $('#topo'); let h = '';
-  for (const z of Object.values(ZONES)) h += `<rect class="zone-r" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="10" fill="${z.color}"/><text class="zone-t" x="${z.x + 10}" y="${z.y + 18}">${z.name}</text>`;
+/* --- topologi berlapis: zona & kabel (statis), node (per render), aliran paket (per frame) --- */
+function renderTopoStatic() {
+  let z = `<defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <radialGradient id="nodeBg"><stop offset="0" stop-color="#1b2a20"/><stop offset="1" stop-color="#0a110c"/></radialGradient></defs>`;
+  for (const k in ZONES) { const Z = ZONES[k];
+    z += `<rect class="zone-r" x="${Z.x}" y="${Z.y}" width="${Z.w}" height="${Z.h}" rx="12" fill="${Z.color}"/>
+      <rect class="zone-h" x="${Z.x + 1}" y="${Z.y + 1}" width="${Z.w - 2}" height="24" rx="11" fill="rgba(255,255,255,.035)"/>
+      <text class="zone-t" x="${Z.x + 12}" y="${Z.y + 17}">${Z.name}</text>`; }
+  const L = (a, b, c = '') => z += `<line class="link ${c}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+  const A = ASSET_BY_ID; L(A['INET'], A['FW-01'], 'trunk'); L(A['SRV-MAIL'], A['FW-01']); L(A['FW-01'], HUBS.it, 'trunk'); L(HUBS.it, HUBS.ot, 'fw');
+  ASSETS.forEach(a => { if (a.zone === 'it') L(a, HUBS.it); if (a.zone === 'ot') L(a, HUBS.ot); });
+  for (const k in HUBS) { const h = HUBS[k]; z += `<g class="hub"><rect x="${h.x - 17}" y="${h.y - 8}" width="34" height="16" rx="4"/><text x="${h.x}" y="${h.y + 0.5}">${h.id}</text></g>`; }
+  z += `<text x="${(HUBS.it.x + HUBS.ot.x) / 2}" y="${HUBS.it.y - 8}" text-anchor="middle" font-size="8" fill="#c98a4a" font-family="Cascadia Mono,Consolas">FW IT/OT</text>`;
+  $('#topo').innerHTML = z + '<g id="tFlow"></g><g id="tNode"></g>';
+}
+function renderNodes() {
+  const g = $('#tNode'); if (!g) return; let h = '';
   const incAssets = new Set(eng.incidents.filter(i => i.status === 'Aktif').flatMap(i => [...i.assets]));
-  for (const f of flows) {
-    const a = ASSET_BY_ID[f.e.src], b = ASSET_BY_ID[f.e.dst]; if (!a || !b) continue;
-    const cls = f.e.blocked ? 'blk' : f.e.scen ? 'bad' : 'ok';
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - 25;
-    h += `<path class="flow ${cls}" d="M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}"/>`;
-  }
   for (const a of ASSETS) {
-    const r = eng.assetRisk(a.id); const col = a.id === 'INET' ? '#3a4a5a' : r >= 70 ? 'var(--crit)' : r >= 45 ? 'var(--high)' : r >= 30 ? 'var(--med)' : 'var(--ok)';
-    const iso = eng.isolated.has(a.id);
-    h += `<g class="node ${iso ? 'iso' : ''}" data-id="${a.id}">${incAssets.has(a.id) && !iso ? `<circle class="ring" cx="${a.x}" cy="${a.y}" r="20"/>` : ''}
-      <circle class="c" cx="${a.x}" cy="${a.y}" r="20" fill="#0d1510" stroke="${col}"/><text class="ic" x="${a.x}" y="${a.y}">${iso ? '🔒' : ICON[a.type]}</text>
-      <text class="lb" x="${a.x}" y="${a.y + 33}">${a.id}</text><title>${a.name} · ${a.ip} · risiko ${r}</title></g>`;
+    const r = eng.assetRisk(a.id); const col = a.id === 'INET' ? '#4a6a8a' : riskCol(r); const iso = eng.isolated.has(a.id);
+    const C = 2 * Math.PI * 24;
+    h += `<g class="node ${iso ? 'iso' : ''}" data-id="${a.id}">${incAssets.has(a.id) && !iso ? `<circle class="ring" cx="${a.x}" cy="${a.y}" r="21"/>` : ''}
+      ${a.id !== 'INET' ? `<circle class="rkb" cx="${a.x}" cy="${a.y}" r="24"/><circle class="rk" cx="${a.x}" cy="${a.y}" r="24" stroke="${col}" stroke-dasharray="${C * Math.max(4, r) / 100} ${C}"/>` : ''}
+      <circle class="c" cx="${a.x}" cy="${a.y}" r="19" fill="url(#nodeBg)" stroke="${col}" ${r >= 70 && !iso ? 'filter="url(#glow)"' : ''}/>
+      <text class="ic" x="${a.x}" y="${a.y + 1}">${iso ? '🔒' : ICON[a.type]}</text>
+      <text class="lb" x="${a.x}" y="${a.y + 37}">${a.id}</text>${a.id !== 'INET' ? `<text class="ip" x="${a.x}" y="${a.y + 47}">${a.ip}</text>` : ''}
+      <title>${a.name} · ${a.ip} · risiko ${r}</title></g>`;
   }
-  svg.innerHTML = h;
+  g.innerHTML = h;
+}
+function frame() {
+  const g = $('#tFlow');
+  if (g && $('#view-dash').classList.contains('active')) {
+    const fr = Math.min(1, Math.max(0, (performance.now() - lastTickPerf) / 250));
+    const now = prevSimT + fr * (simT - prevSimT); let h = '';
+    for (const f of flows) {
+      const e = f.e; if (e.ts > now) continue;
+      const a = ASSET_BY_ID[e.src], b = ASSET_BY_ID[e.dst]; if (!a || !b) continue;
+      const cls = e.blocked ? 'blk' : e.scen ? 'bad' : 'ok';
+      const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2 - 28;
+      h += `<path class="flow ${cls}" d="M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}"/>`;
+      let p = (now - e.ts) / (0.7 * S.speed); if (e.blocked) p = Math.min(p, 0.5);
+      if (p <= 1) {
+        const q = 1 - p, x = q * q * a.x + 2 * q * p * cx + p * p * b.x, y = q * q * a.y + 2 * q * p * cy + p * p * b.y;
+        h += e.blocked && p >= 0.5 ? `<path class="xmark" d="M${x - 5},${y - 5}L${x + 5},${y + 5}M${x + 5},${y - 5}L${x - 5},${y + 5}"/>`
+          : `<circle class="pkt ${cls}" cx="${x}" cy="${y}" r="${cls === 'bad' ? 3.6 : 2.4}" ${cls === 'bad' ? 'filter="url(#glow)"' : ''}/>`;
+      }
+    }
+    g.innerHTML = h;
+  }
+  requestAnimationFrame(frame);
 }
 function renderScen() {
-  $('#scen').innerHTML = SCENARIOS.map(s => `<div class="sc ${running.has(s.id) ? 'running' : ''}"><div class="h"><span class="ic">${s.icon}</span>${esc(s.name)}<span class="tag ${s.dom === 'OT' ? 'ot' : ''}">${s.dom}</span></div>
-    <p>${esc(s.desc)}</p><button class="btn small" data-scen="${s.id}" ${running.has(s.id) ? 'disabled' : ''}>${running.has(s.id) ? '⏳ Berjalan…' : '▶ Luncurkan'}</button></div>`).join('');
+  $('#scen').innerHTML = SCENARIOS.map(s => { const on = running.has(s.id);
+    const pr = on && scenTotal[s.id] ? 100 * (1 - queue.filter(e => e.scen === s.id).length / scenTotal[s.id]) : 0;
+    return `<div class="sc ${on ? 'running' : ''}"><div class="h"><span class="ic">${s.icon}</span>${esc(s.name)}<span class="tag ${s.dom === 'OT' ? 'ot' : ''}">${s.dom}</span></div>
+    <p>${esc(s.desc)}</p><button class="btn small" data-scen="${s.id}" ${on ? 'disabled' : ''}>${on ? `⏳ Berjalan… ${Math.round(pr)}%` : '▶ Luncurkan'}</button>${on ? `<i class="prog" style="width:${pr}%"></i>` : ''}</div>`; }).join('');
 }
 function renderIncList() {
   const L = eng.incidents.slice().reverse();
@@ -161,7 +225,7 @@ function renderIncDetail() {
     <div class="kc">${TACTIC_ORDER.map(t => `<div class="${inc.tactics.includes(t) ? 'on' : ''}">${TACTIC_ID[t]}</div>`).join('')}</div>
     <div class="muted small" style="margin:10px 0 6px">Kronologi peringatan terkorelasi</div>
     <div class="tl">${inc.alerts.map(a => `<div class="it v${SEV[a.sev]}"><span class="time">${wib(a.ts)}</span> <span class="sev s${SEV[a.sev]}">${SEV_LABEL[SEV[a.sev]]}</span> <b>${esc(a.title)}</b><div class="small muted">${esc(a.detail)}</div></div>`).join('')}</div>
-  </div><div>
+  </div><div class="side">
     <div class="muted small">Skor risiko insiden</div><div class="score" style="color:${inc.sev >= 4 ? 'var(--crit)' : inc.sev >= 3 ? 'var(--high)' : 'var(--med)'}">${inc.score}<span class="muted" style="font-size:14px">/100</span></div>
     <div class="muted small" style="margin-top:8px">Aset terlibat</div><div class="m" style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0">${[...inc.assets].map(x => `<span class="tt ${ASSET_BY_ID[x]?.zone === 'ot' ? 'ics' : ''}">${x}${eng.isolated.has(x) ? ' 🔒' : ''}</span>`).join('')}</div>
     <div class="muted small" style="margin-top:8px">Teknik terdeteksi</div><div style="font-size:12.5px">${[...inc.techs].sort().map(t => `<div><span class="tt ${MITRE[t].dom === 'ICS' ? 'ics' : ''}">${t}</span> ${esc(MITRE[t].name)}</div>`).join('')}</div>
@@ -237,10 +301,22 @@ $('#logFile').onchange = e => { const f = e.target.files[0]; if (f) f.text().the
 
 /* ---------- boot ---------- */
 reset();
-setTimeout(() => {
-  const t0 = performance.now(); const { model, n } = trainBaseline(); MODEL = model; eng.model = model;
-  $('#chipModel').textContent = `AI: Isolation Forest aktif · baseline ${n} jendela · ${Math.round(performance.now() - t0)} ms`;
-  $('#chipModel').classList.add('ok');
-  setInterval(tick, 250);
-  const q = new URLSearchParams(location.search); if (q.get('auto')) setTimeout(() => $('#btnAll').click(), 1500);
-}, 50);
+requestAnimationFrame(frame);
+(function boot() {
+  const step = (t, w) => { $('#spStep').textContent = t; $('#spBar').style.width = w + '%'; };
+  const later = (ms, f) => setTimeout(f, ms);
+  step('Memuat inventaris 18 aset IT & OT/IoT…', 18);
+  later(300, () => {
+    step('Melatih baseline AI (Isolation Forest) per aset…', 45);
+    later(60, () => {
+      const t0 = performance.now(); const { model, n } = trainBaseline(); MODEL = model; eng.model = model;
+      const ms = Math.round(performance.now() - t0);
+      $('#chipModel').textContent = `AI: Isolation Forest aktif · baseline ${n} jendela · ${ms} ms`; $('#chipModel').classList.add('ok');
+      step(`Baseline terbentuk: ${n} jendela perilaku (${ms} ms) · memuat 16 aturan deteksi…`, 75);
+      later(350, () => { step('Memuat basis pengetahuan MITRE ATT&CK Enterprise + ICS…', 92);
+        later(300, () => { step('Siap · mode air-gapped · 0 byte keluar', 100);
+          later(350, () => { $('#splash').classList.add('hide'); setInterval(tick, 250);
+            const q = new URLSearchParams(location.search); if (q.get('auto')) setTimeout(() => $('#btnAll').click(), 1200); }); }); });
+    });
+  });
+})();

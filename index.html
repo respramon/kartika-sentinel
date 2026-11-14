@@ -9,6 +9,15 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<div id="splash">
+  <div class="sp-in">
+    <svg viewBox="0 0 64 64" class="sp-logo" aria-hidden="true"><path d="M32 3 L58 13 V31 C58 46 47 56 32 61 C17 56 6 46 6 31 V13 Z" fill="#c9a227"/><path d="M32 12 L50 19 V31 C50 42 42 49 32 53 C22 49 14 42 14 31 V19 Z" fill="#0d150f"/><circle cx="32" cy="32" r="8" fill="#35d07f"/><circle cx="32" cy="32" r="14" fill="none" stroke="#35d07f" stroke-width="2" opacity=".5"/></svg>
+    <div class="sp-name">KARTIKA-SENTINEL</div>
+    <div class="sp-sub">Sistem Penangkalan Siber Satuan · Air-Gapped AI</div>
+    <div class="sp-bar"><i id="spBar"></i></div>
+    <div class="sp-step mono" id="spStep">Memuat inventaris aset…</div>
+  </div>
+</div>
 <header class="top">
   <div class="brand">
     <svg viewBox="0 0 64 64" class="logo" aria-hidden="true"><path d="M32 3 L58 13 V31 C58 46 47 56 32 61 C17 56 6 46 6 31 V13 Z" fill="#c9a227"/><path d="M32 12 L50 19 V31 C50 42 42 49 32 53 C22 49 14 42 14 31 V19 Z" fill="#111a12"/><circle cx="32" cy="32" r="8" fill="#35d07f"/><circle cx="32" cy="32" r="14" fill="none" stroke="#35d07f" stroke-width="2" opacity=".5"/></svg>
@@ -18,6 +27,7 @@
     </div>
   </div>
   <div class="chips">
+    <span class="threat" id="threat"><i></i><span id="threatTxt">SIAGA NORMAL</span></span>
     <span class="chip ok" title="Tidak ada satu pun permintaan jaringan keluar; seluruh analitik berjalan di perangkat ini">● MODE AIR-GAPPED · 0 byte keluar</span>
     <span class="chip" id="chipModel">AI: melatih baseline…</span>
     <span class="chip mono" id="clock">--:--:-- WIB</span>
@@ -25,24 +35,25 @@
 </header>
 
 <nav class="tabs" id="tabs">
-  <button data-view="dash" class="active">Dasbor</button>
-  <button data-view="inc">Insiden <span class="badge" id="incBadge">0</span></button>
-  <button data-view="mitre">Matriks ATT&amp;CK</button>
-  <button data-view="assets">Aset &amp; Risiko</button>
-  <button data-view="logs">Analisis Log</button>
-  <button data-view="report">Laporan Otomatis</button>
-  <button data-view="about">Arsitektur</button>
+  <button data-view="dash" class="active"><span class="ti">◉</span>Dasbor</button>
+  <button data-view="inc"><span class="ti">⚠</span>Insiden <span class="badge" id="incBadge">0</span></button>
+  <button data-view="mitre"><span class="ti">▦</span>Matriks ATT&amp;CK</button>
+  <button data-view="assets"><span class="ti">◫</span>Aset &amp; Risiko</button>
+  <button data-view="logs"><span class="ti">≣</span>Analisis Log</button>
+  <button data-view="report"><span class="ti">✉</span>Laporan Otomatis</button>
+  <button data-view="about"><span class="ti">⬡</span>Arsitektur</button>
+  <span class="unit">SATUAN SIMULASI · YONIF 000/KARTIKA</span>
 </nav>
 
 <main>
   <!-- DASBOR -->
   <section class="view active" id="view-dash">
     <div class="kpis">
-      <div class="kpi posture"><div class="gauge" id="gauge"></div><div><div class="kpi-l">Postur Keamanan Satuan</div><div class="kpi-v" id="kPosture">--</div><div class="kpi-s" id="kPostureTxt">menunggu…</div></div></div>
-      <div class="kpi"><div class="kpi-l">Aset dipantau</div><div class="kpi-v" id="kAssets">--</div><div class="kpi-s">IT <b id="kIt"></b> · OT/IoT <b id="kOt"></b></div></div>
-      <div class="kpi"><div class="kpi-l">Event / menit</div><div class="kpi-v" id="kEpm">0</div><div class="kpi-s">Modbus · SMB · DNS · Telnet · ARP</div></div>
-      <div class="kpi"><div class="kpi-l">Insiden aktif</div><div class="kpi-v" id="kInc">0</div><div class="kpi-s" id="kIncS">aman</div></div>
-      <div class="kpi"><div class="kpi-l">Ancaman diblokir</div><div class="kpi-v" id="kBlk">0</div><div class="kpi-s">oleh respons otomatis/manual</div></div>
+      <div class="kpi posture"><div class="gauge" id="gauge"></div><div class="grow"><div class="kpi-l">Postur Keamanan Satuan</div><div class="kpi-v" id="kPosture">--</div><div class="kpi-s" id="kPostureTxt">menunggu…</div><canvas class="spark" id="spPost" width="220" height="34"></canvas></div></div>
+      <div class="kpi"><div class="kpi-l"><span class="ki">◎</span>Aset dipantau</div><div class="kpi-v" id="kAssets">--</div><div class="kpi-s">IT <b id="kIt"></b> · OT/IoT <b id="kOt"></b></div><div class="mini" id="kZones"></div></div>
+      <div class="kpi"><div class="kpi-l"><span class="ki">≋</span>Event / menit</div><div class="kpi-v" id="kEpm">0</div><canvas class="spark" id="spEpm" width="220" height="34"></canvas></div>
+      <div class="kpi"><div class="kpi-l"><span class="ki">⚠</span>Insiden aktif</div><div class="kpi-v" id="kInc">0</div><div class="kpi-s" id="kIncS">aman</div><canvas class="spark" id="spAl" width="220" height="34"></canvas></div>
+      <div class="kpi"><div class="kpi-l"><span class="ki">⛨</span>Ancaman diblokir</div><div class="kpi-v" id="kBlk">0</div><div class="kpi-s">oleh respons otomatis/manual</div><div class="kpi-s" id="kIso">0 host diisolasi</div></div>
     </div>
 
     <div class="grid2">
@@ -111,7 +122,10 @@
   <section class="view" id="view-report">
     <div class="card"><div class="card-h"><h2>Laporan Khusus (LAPSUS) Insiden Siber — dibuat otomatis</h2>
       <div class="row"><select id="repSel"></select><button class="btn" id="btnTxt">Unduh .txt</button><button class="btn ghost" id="btnPrint">Cetak / PDF</button><button class="btn ghost" id="btnStix">Ekspor IoC (STIX 2.1)</button></div></div>
-      <pre id="report" class="report mono">Belum ada insiden untuk dilaporkan. Jalankan skenario di Dasbor terlebih dahulu.</pre></div>
+      <div class="paper">
+        <div class="kop"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 3 L58 13 V31 C58 46 47 56 32 61 C17 56 6 46 6 31 V13 Z" fill="#8a6d12"/><path d="M32 12 L50 19 V31 C50 42 42 49 32 53 C22 49 14 42 14 31 V19 Z" fill="#f6f3e8"/><circle cx="32" cy="32" r="8" fill="#1f6b44"/></svg>
+          <div><b>KARTIKA-SENTINEL</b><span>Draf Laporan Khusus Insiden Siber · dibuat otomatis, wajib diverifikasi Perwira Siber</span></div><em id="repStamp">DRAF</em></div>
+        <pre id="report" class="report mono">Belum ada insiden untuk dilaporkan. Jalankan skenario di Dasbor terlebih dahulu.</pre></div></div>
   </section>
 
   <!-- ARSITEKTUR -->
@@ -148,6 +162,14 @@
     </div>
   </section>
 </main>
+<footer class="statusbar mono">
+  <span><i class="dot ok"></i>Sensor jaringan: 3 aktif</span>
+  <span><i class="dot ok"></i>Model AI: Isolation Forest · baseline per-aset</span>
+  <span>Aturan deteksi: 16</span>
+  <span>IoC lokal: 5</span>
+  <span><i class="dot ok"></i>Penyimpanan: lokal (tanpa cloud)</span>
+  <span class="sb-r">KARTIKA-SENTINEL v1.1 · Tim siberian</span>
+</footer>
 <div id="toasts"></div>
 <script src="js/data.js"></script>
 <script src="js/engine.js"></script>
