@@ -1,9 +1,9 @@
-﻿# KARTIKA-SENTINEL 🛡️
+# KARTIKA-SENTINEL 🛡️
 
 **Sistem Penangkalan Siber Satuan berbasis AI — IT + OT/IoT markas, air-gapped.**
 Purwarupa untuk **Kartika Cyber Hackathon 2026**, kategori **Penangkalan**, oleh **Tim siberian**.
 
-**Demo langsung:** https://respramon.github.io/kartika-sentinel/ · **Video demo:** https://youtu.be/FaV6W15-9GQ · **Slide:** [docs/KARTIKA-SENTINEL-slides.pdf](docs/KARTIKA-SENTINEL-slides.pdf)
+**Demo langsung:** https://respramon.github.io/kartika-sentinel/ · **Video demo:** https://youtu.be/HjOiHz3hZ08 · **Slide:** [docs/KARTIKA-SENTINEL-slides.pdf](docs/KARTIKA-SENTINEL-slides.pdf)
 
 > Satu mini-PC + satu port mirror = SOC mini untuk satuan TNI AD: mendeteksi serangan pada jaringan staf **dan** perangkat fisik markas (genset, CCTV, kontrol akses, radio IP), memetakan ke MITRE ATT&CK, memberi langkah respons, dan menulis Laporan Khusus (LAPSUS) insiden secara otomatis — tanpa internet, tanpa cloud asing.
 
