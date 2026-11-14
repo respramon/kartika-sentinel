@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KARTIKA-SENTINEL — SOC Air-Gapped untuk Satuan TNI AD</title>
+<meta name="description" content="Purwarupa Kartika Cyber Hackathon 2026 — kategori Penangkalan. Deteksi ancaman IT & OT/IoT markas berbasis AI, pemetaan MITRE ATT&CK, respons, dan laporan insiden otomatis.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><path d='M32 3 L58 13 V31 C58 46 47 56 32 61 C17 56 6 46 6 31 V13 Z' fill='%23c9a227'/><path d='M32 12 L50 19 V31 C50 42 42 49 32 53 C22 49 14 42 14 31 V19 Z' fill='%23111a12'/><circle cx='32' cy='32' r='8' fill='%2335d07f'/></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 64 64" class="logo" aria-hidden="true"><path d="M32 3 L58 13 V31 C58 46 47 56 32 61 C17 56 6 46 6 31 V13 Z" fill="#c9a227"/><path d="M32 12 L50 19 V31 C50 42 42 49 32 53 C22 49 14 42 14 31 V19 Z" fill="#111a12"/><circle cx="32" cy="32" r="8" fill="#35d07f"/><circle cx="32" cy="32" r="14" fill="none" stroke="#35d07f" stroke-width="2" opacity=".5"/></svg>
+    <div>
+      <div class="brand-name">KARTIKA-SENTINEL</div>
+      <div class="brand-sub">Sistem Penangkalan Siber Satuan · IT + OT/IoT · Air-Gapped AI</div>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip ok" title="Tidak ada satu pun permintaan jaringan keluar; seluruh analitik berjalan di perangkat ini">● MODE AIR-GAPPED · 0 byte keluar</span>
+    <span class="chip" id="chipModel">AI: melatih baseline…</span>
+    <span class="chip mono" id="clock">--:--:-- WIB</span>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-view="dash" class="active">Dasbor</button>
+  <button data-view="inc">Insiden <span class="badge" id="incBadge">0</span></button>
+  <button data-view="mitre">Matriks ATT&amp;CK</button>
+  <button data-view="assets">Aset &amp; Risiko</button>
+  <button data-view="logs">Analisis Log</button>
+  <button data-view="report">Laporan Otomatis</button>
+  <button data-view="about">Arsitektur</button>
+</nav>
+
+<main>
+  <!-- DASBOR -->
+  <section class="view active" id="view-dash">
+    <div class="kpis">
+      <div class="kpi posture"><div class="gauge" id="gauge"></div><div><div class="kpi-l">Postur Keamanan Satuan</div><div class="kpi-v" id="kPosture">--</div><div class="kpi-s" id="kPostureTxt">menunggu…</div></div></div>
+      <div class="kpi"><div class="kpi-l">Aset dipantau</div><div class="kpi-v" id="kAssets">--</div><div class="kpi-s">IT <b id="kIt"></b> · OT/IoT <b id="kOt"></b></div></div>
+      <div class="kpi"><div class="kpi-l">Event / menit</div><div class="kpi-v" id="kEpm">0</div><div class="kpi-s">Modbus · SMB · DNS · Telnet · ARP</div></div>
+      <div class="kpi"><div class="kpi-l">Insiden aktif</div><div class="kpi-v" id="kInc">0</div><div class="kpi-s" id="kIncS">aman</div></div>
+      <div class="kpi"><div class="kpi-l">Ancaman diblokir</div><div class="kpi-v" id="kBlk">0</div><div class="kpi-s">oleh respons otomatis/manual</div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-h"><h2>Peta Jaringan Markas (langsung)</h2>
+          <div class="legend"><i class="l-ok"></i>normal <i class="l-bad"></i>serangan <i class="l-blk"></i>diblokir</div></div>
+        <svg id="topo" viewBox="0 0 900 430" role="img" aria-label="Topologi jaringan markas"></svg>
+      </div>
+      <div class="card feed-card">
+        <div class="card-h"><h2>Peringatan Terkini</h2><span class="muted" id="alertCount">0 peringatan</span></div>
+        <div id="feed" class="feed"><div class="empty">Belum ada ancaman. Jalankan skenario latihan di bawah untuk menguji deteksi.</div></div>
+      </div>
+    </div>
+
+    <div class="grid2b">
+      <div class="card">
+        <div class="card-h"><h2>Simulator Latihan Serangan (Cyber Range)</h2>
+          <div class="ctrl">
+            <label class="sw"><input type="checkbox" id="autoResp"><span></span> Respons otomatis (SOAR) untuk KRITIS</label>
+            <label>Kecepatan <select id="speed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
+          </div></div>
+        <div class="scen" id="scen"></div>
+        <div class="scen-foot"><button class="btn ghost" id="btnAll">▶ Jalankan semua skenario berurutan</button><button class="btn ghost" id="btnReset">↺ Reset lingkungan</button></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Aliran Event Sensor</h2><span class="muted">sampel langsung</span></div>
+        <div class="evlog mono" id="evlog"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSIDEN -->
+  <section class="view" id="view-inc">
+    <div class="incwrap">
+      <div class="card inclist"><div class="card-h"><h2>Daftar Insiden</h2></div><div id="incList"><div class="empty">Belum ada insiden.</div></div></div>
+      <div class="card incdetail" id="incDetail"><div class="empty">Pilih insiden untuk melihat rantai serangan, teknik ATT&amp;CK, dan opsi respons.</div></div>
+    </div>
+  </section>
+
+  <!-- MITRE -->
+  <section class="view" id="view-mitre">
+    <div class="card"><div class="card-h"><h2>Matriks MITRE ATT&amp;CK — Enterprise &amp; ICS</h2><span class="muted">Sel menyala = teknik terdeteksi (angka = jumlah peringatan)</span></div>
+      <div class="matrix" id="matrix"></div></div>
+  </section>
+
+  <!-- ASET -->
+  <section class="view" id="view-assets">
+    <div class="card"><div class="card-h"><h2>Inventaris Aset &amp; Skor Risiko</h2><span class="muted">Risiko = kekritisan × kerentanan × peringatan aktif</span></div>
+      <div class="tablewrap"><table class="tbl" id="assetTbl"></table></div></div>
+  </section>
+
+  <!-- LOG -->
+  <section class="view" id="view-logs">
+    <div class="grid2">
+      <div class="card"><div class="card-h"><h2>Analisis Log Forensik (offline)</h2></div>
+        <p class="muted small">Tempel atau unggah log <b>auth.log (sshd)</b> atau <b>CSV sensor</b> (<code>waktu,src_ip,dst_ip,proto,port,tipe,atribut=nilai;…</code>). Log diproses di peramban ini — tidak diunggah ke mana pun.</p>
+        <textarea id="logIn" class="mono" spellcheck="false" placeholder="Tempel log di sini…"></textarea>
+        <div class="row"><button class="btn" id="btnAnalyze">Analisis</button><button class="btn ghost" id="btnSample">Muat contoh log</button>
+          <label class="btn ghost file">Unggah berkas<input type="file" id="logFile" accept=".log,.txt,.csv"></label></div>
+      </div>
+      <div class="card"><div class="card-h"><h2>Hasil Analisis</h2><span class="muted" id="logStat"></span></div><div id="logOut" class="feed"><div class="empty">Belum ada analisis.</div></div></div>
+    </div>
+  </section>
+
+  <!-- LAPORAN -->
+  <section class="view" id="view-report">
+    <div class="card"><div class="card-h"><h2>Laporan Khusus (LAPSUS) Insiden Siber — dibuat otomatis</h2>
+      <div class="row"><select id="repSel"></select><button class="btn" id="btnTxt">Unduh .txt</button><button class="btn ghost" id="btnPrint">Cetak / PDF</button><button class="btn ghost" id="btnStix">Ekspor IoC (STIX 2.1)</button></div></div>
+      <pre id="report" class="report mono">Belum ada insiden untuk dilaporkan. Jalankan skenario di Dasbor terlebih dahulu.</pre></div>
+  </section>
+
+  <!-- ARSITEKTUR -->
+  <section class="view" id="view-about">
+    <div class="card about">
+      <h2>Arsitektur KARTIKA-SENTINEL</h2>
+      <div class="arch">
+        <div class="layer"><b>1 · Sensor</b><span>Port mirror/TAP switch markas · parser Modbus/TCP, SMB, DNS, Telnet, ARP/DHCP · agen ringan endpoint (proses) · syslog OT</span></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><b>2 · Mesin Deteksi Hibrida</b><span>Aturan gaya Sigma (16 aturan IT+OT) · AI Isolation Forest (7 fitur perilaku/aset, dilatih dari baseline normal satuan) · entropi Shannon untuk DNS tunneling · deteksi beacon C2 statistik · IoC lokal</span></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><b>3 · Korelasi &amp; Skor Risiko</b><span>Alert dikelompokkan menjadi insiden berdasarkan aset &amp; waktu · urutan kill chain MITRE ATT&amp;CK Enterprise + ICS · skor = keparahan × tahapan × kekritisan aset</span></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><b>4 · Respons (SOAR)</b><span>Isolasi host · blokir IP di firewall · reset kredensial · RUN-LOCK PLC · mode otomatis untuk insiden KRITIS</span></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><b>5 · Pelaporan Berjenjang</b><span>LAPSUS berformat tata naskah militer · ekspor IoC STIX 2.1 untuk berbagi intelijen ke Pussiberad · cetak/PDF</span></div>
+      </div>
+      <div class="cols3">
+        <div><h3>Mengapa relevan bagi TNI AD</h3><ul>
+          <li>Markas modern bergantung pada genset, CCTV, kontrol akses, dan radio IP — <b>permukaan serangan OT</b> yang jarang dipantau.</li>
+          <li>Tidak semua satuan memiliki personel SOC; SENTINEL menerjemahkan deteksi menjadi <b>laporan siap kirim</b> dan langkah respons yang jelas.</li>
+          <li><b>Berdaulat</b>: berjalan tanpa internet/cloud asing, data tidak keluar satuan.</li></ul></div>
+        <div><h3>Kelayakan implementasi</h3><ul>
+          <li>Perangkat: 1 mini-PC (±Rp 6–8 juta) + 1 port mirror pada switch markas.</li>
+          <li>Pemasangan &lt; 1 hari; baseline AI terbentuk otomatis dari lalu lintas normal.</li>
+          <li>Simulator latihan bawaan = <b>cyber range</b> untuk melatih personel satuan.</li>
+          <li>Integrasi ke tingkat atas lewat STIX 2.1 / syslog (Wazuh, OpenCTI, dll).</li></ul></div>
+        <div><h3>Status purwarupa</h3><ul>
+          <li>Aplikasi web statis tanpa dependensi eksternal — dapat dibuka offline dari flashdisk.</li>
+          <li>Data jaringan pada demo adalah <b>simulasi</b>; mesin deteksi, AI, korelasi, dan laporan berjalan sungguhan atas data tersebut.</li>
+          <li>Pengembangan lanjut: sensor Zeek/Suricata nyata, LLM lokal (mis. model open-weight via Ollama) untuk ringkasan, dasbor komando multi-satuan.</li></ul></div>
+      </div>
+      <p class="muted small">Kartika Cyber Hackathon 2026 · Kategori Penangkalan · Tim siberian. Atribusi: kerangka MITRE ATT&amp;CK® © The MITRE Corporation (digunakan sebagai referensi taksonomi). Seluruh nama satuan, aset, IP, dan kejadian pada demo adalah fiktif.</p>
+    </div>
+  </section>
+</main>
+<div id="toasts"></div>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/report.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
