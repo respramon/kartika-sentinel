@@ -25,6 +25,7 @@ Purwarupa untuk **Kartika Cyber Hackathon 2026**, kategori **Penangkalan**, oleh
 | **LAPSUS otomatis** | Laporan Khusus berformat naskah dinas (nomor, derajat KILAT/SEGERA, kronologis, IoC, dampak, rekomendasi) — unduh .txt / cetak PDF |
 | Ekspor STIX 2.1 | Berbagi IoC ke tingkat atas (Pussiberad / platform CTI) |
 | Analisis log forensik | Unggah `auth.log` atau CSV sensor; dianalisis lokal di peramban |
+| **AI generatif (opsional)** | Konektor LLM 30 penyedia: lokal (Ollama, LM Studio, llama.cpp, vLLM, LocalAI, Jan), router/gateway (OmniRoute, 9router, LiteLLM, OpenRouter), gratis/free-tier (Gemini AI Studio, Groq, Cerebras, GitHub Models, Hugging Face, SambaNova, NVIDIA NIM, Cloudflare), cloud berbayar (OpenAI, Anthropic Claude, Azure OpenAI, Mistral, DeepSeek, xAI, Cohere, Perplexity, Together, Fireworks), serta endpoint kustom OpenAI/Anthropic-compatible. Pilih model dari preset, dari daftar langsung penyedia (`/models`), atau ketik manual; uji koneksi; penyamaran IP/MAC internal; kunci API hanya di peramban. Fitur: analisis insiden, penyempurnaan LAPSUS, penjelasan log, chat “Tanya SENTINEL”. **Bawaan nonaktif** sehingga sistem tetap air-gapped. |
 | Cyber range | 5 skenario latihan: phishing→ransomware, sabotase genset Modbus, botnet CCTV, DNS exfiltration, rogue device + ARP spoofing |
 
 ## Arsitektur

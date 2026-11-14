@@ -28,7 +28,8 @@
   </div>
   <div class="chips">
     <span class="threat" id="threat"><i></i><span id="threatTxt">SIAGA NORMAL</span></span>
-    <span class="chip ok" title="Tidak ada satu pun permintaan jaringan keluar; seluruh analitik berjalan di perangkat ini">● MODE AIR-GAPPED · 0 byte keluar</span>
+    <span class="chip ok" id="chipGap" title="Tanpa AI generatif cloud, tidak ada satu pun permintaan jaringan keluar; seluruh analitik berjalan di perangkat ini">● MODE AIR-GAPPED · 0 byte keluar</span>
+    <button class="chip btnchip" id="chipLLM" title="Pengaturan AI generatif (LLM)">⚙ AI generatif: nonaktif</button>
     <span class="chip" id="chipModel">AI: melatih baseline…</span>
     <span class="chip mono" id="clock">--:--:-- WIB</span>
   </div>
@@ -121,7 +122,7 @@
   <!-- LAPORAN -->
   <section class="view" id="view-report">
     <div class="card"><div class="card-h"><h2>Laporan Khusus (LAPSUS) Insiden Siber — dibuat otomatis</h2>
-      <div class="row"><select id="repSel"></select><button class="btn" id="btnTxt">Unduh .txt</button><button class="btn ghost" id="btnPrint">Cetak / PDF</button><button class="btn ghost" id="btnStix">Ekspor IoC (STIX 2.1)</button></div></div>
+      <div class="row"><select id="repSel"></select><button class="btn ai" id="btnAIRep">✨ Sempurnakan dengan AI</button><button class="btn ghost" id="btnTplRep" style="display:none">↺ Versi templat</button><button class="btn" id="btnTxt">Unduh .txt</button><button class="btn ghost" id="btnPrint">Cetak / PDF</button><button class="btn ghost" id="btnStix">Ekspor IoC (STIX 2.1)</button></div></div>
       <div class="paper">
         <div class="kop"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 3 L58 13 V31 C58 46 47 56 32 61 C17 56 6 46 6 31 V13 Z" fill="#8a6d12"/><path d="M32 12 L50 19 V31 C50 42 42 49 32 53 C22 49 14 42 14 31 V19 Z" fill="#f6f3e8"/><circle cx="32" cy="32" r="8" fill="#1f6b44"/></svg>
           <div><b>KARTIKA-SENTINEL</b><span>Draf Laporan Khusus Insiden Siber · dibuat otomatis, wajib diverifikasi Perwira Siber</span></div><em id="repStamp">DRAF</em></div>
@@ -142,6 +143,8 @@
         <div class="layer"><b>4 · Respons (SOAR)</b><span>Isolasi host · blokir IP di firewall · reset kredensial · RUN-LOCK PLC · mode otomatis untuk insiden KRITIS</span></div>
         <div class="arrow">▼</div>
         <div class="layer"><b>5 · Pelaporan Berjenjang</b><span>LAPSUS berformat tata naskah militer · ekspor IoC STIX 2.1 untuk berbagi intelijen ke Pussiberad · cetak/PDF</span></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><b>6 · AI Generatif (opsional)</b><span>Konektor LLM multi-penyedia: lokal (Ollama, LM Studio, llama.cpp, vLLM, LocalAI, Jan), router (OmniRoute, 9router, LiteLLM, OpenRouter), gratis (Gemini, Groq, Cerebras, GitHub Models, HF, …), cloud (OpenAI, Claude, Azure, Mistral, DeepSeek, …) · analisis insiden, penyempurnaan LAPSUS, chat “Tanya SENTINEL” · penyamaran IP/MAC internal · bawaan nonaktif</span></div>
       </div>
       <div class="cols3">
         <div><h3>Mengapa relevan bagi TNI AD</h3><ul>
@@ -171,9 +174,47 @@
   <span class="sb-r">KARTIKA-SENTINEL v1.1 · Tim siberian</span>
 </footer>
 <div id="toasts"></div>
+
+<!-- ===== Pengaturan AI generatif ===== -->
+<div id="aiModal" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
+  <div class="mbox">
+    <div class="mhead"><h2 id="aiTitle">Pengaturan AI Generatif (LLM)</h2><button class="x" id="aiX" aria-label="Tutup">✕</button></div>
+    <p class="muted small">Bawaan: <b>nonaktif</b> — deteksi inti (aturan + Isolation Forest) selalu berjalan lokal tanpa LLM. Aktifkan bila ingin analisis naratif, LAPSUS yang disempurnakan, dan chat. Untuk operasi nyata gunakan penyedia <b>lokal</b>.</p>
+    <label class="sw big"><input type="checkbox" id="aiEnabled"><span></span> Aktifkan AI generatif</label>
+    <div class="fgrid">
+      <label class="fld wide"><span>Penyedia AI <em id="aiCat" class="cat">LOKAL</em></span><select id="aiProv"></select></label>
+      <div class="help wide" id="aiHelp"></div>
+      <label class="fld wide"><span>Base URL / endpoint</span><input id="aiBase" spellcheck="false" placeholder="https://…/v1"></label>
+      <div id="aiExtra" class="wide fgrid2"></div>
+      <label class="fld wide" id="aiKeyRow"><span id="aiKeyLbl">API key</span><div class="inrow"><input id="aiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"><button type="button" class="btn ghost small" id="aiKeyShow">👁</button></div></label>
+      <div class="fld wide" id="aiModelRow"><span>Model</span>
+        <div class="inrow"><input id="aiModel" list="aiModelList" spellcheck="false" placeholder="nama model"><button type="button" class="btn ghost small" id="aiBtnList">⟳ Ambil daftar model</button></div>
+        <datalist id="aiModelList"></datalist><div class="mchips" id="aiChips"></div></div>
+      <label class="fld"><span>Maks. token jawaban</span><input id="aiMaxT" type="number" min="64" max="128000" value="2048"></label>
+      <label class="fld" id="aiTempRow"><span>Temperature (kosong = bawaan)</span><input id="aiTemp" type="number" step="0.1" min="0" max="2" placeholder="0.2"></label>
+      <details class="wide"><summary>Lanjutan</summary><label class="fld"><span>Header HTTP tambahan (JSON)</span><input id="aiHeaders" spellcheck="false" placeholder='{"X-Org-Id":"satuan"}'></label></details>
+      <label class="ck wide"><input type="checkbox" id="aiRedact" checked> Samarkan IP & MAC internal sebelum dikirim ke AI</label>
+      <label class="ck wide"><input type="checkbox" id="aiRemember"> Ingat API key di peramban ini (bawaan: hanya selama tab terbuka)</label>
+    </div>
+    <div id="aiLoc" class="locnote"></div>
+    <div id="aiTest" class="testout"></div>
+    <div class="row mfoot"><button class="btn ghost" id="aiBtnTest">⚡ Uji koneksi</button><button class="btn ghost" id="aiBtnReset">Hapus konfigurasi</button><span class="grow"></span><button class="btn" id="aiBtnSave">Simpan</button></div>
+  </div>
+</div>
+
+<!-- ===== Chat Tanya SENTINEL ===== -->
+<button id="aiFab" title="Tanya SENTINEL (AI)">🧠 Tanya SENTINEL</button>
+<div id="aiChat">
+  <div class="mhead"><h2>Tanya SENTINEL</h2><button class="x" id="aiChatX" aria-label="Tutup">✕</button></div>
+  <div class="qchips"><button data-q="Ringkas situasi siber satuan saat ini untuk laporan ke Dansat.">Ringkas situasi</button><button data-q="Insiden mana yang harus ditangani lebih dulu dan mengapa?">Prioritas insiden</button><button data-q="Apa rekomendasi pengerasan (hardening) untuk zona OT markas berdasarkan kejadian ini?">Hardening OT</button></div>
+  <div id="aiMsgs"></div>
+  <div class="inrow chatin"><textarea id="aiQ" rows="2" placeholder="Tulis pertanyaan… (Enter untuk kirim)"></textarea><button class="btn" id="aiSend">Kirim</button></div>
+</div>
 <script src="js/data.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/report.js"></script>
+<script src="js/ai.js"></script>
 <script src="js/app.js"></script>
+<script src="js/ai-ui.js"></script>
 </body>
 </html>

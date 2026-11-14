@@ -235,7 +235,7 @@ function renderIncDetail() {
       <button class="btn small ghost" data-act="close" ${inc.status !== 'Aktif' ? 'disabled' : ''}>Tandai terkendali</button>
       <button class="btn small" data-goreport="${inc.id}">📄 Buat LAPSUS</button></div>
     ${inc.actions.map(a => `<div class="done">✔ ${wib(a.ts)} ${esc(a.text)}</div>`).join('')}
-  </div></div>`;
+  </div></div>${typeof aiIncBlock === 'function' ? aiIncBlock(inc) : ''}`;
 }
 function renderMatrix() {
   const cnt = {}; eng.alerts.forEach(a => a.techs.forEach(t => cnt[t] = (cnt[t] || 0) + 1));
@@ -262,7 +262,9 @@ function renderReportSel() {
 function renderReport() {
   const inc = eng.incidents.find(i => i.id === $('#repSel').value);
   if (!inc) return;
-  const txt = buildReport(inc, eng); if (txt !== repCur) { $('#report').textContent = txt; repCur = txt; }
+  const ai = typeof aiReport !== 'undefined' && aiReport[inc.id]?.on ? aiReport[inc.id].text : null;
+  const txt = ai || buildReport(inc, eng); if (txt !== repCur) { $('#report').textContent = txt; repCur = txt; }
+  if (typeof aiRepButtons === 'function') aiRepButtons();
 }
 function download(name, text, type = 'text/plain') {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -274,8 +276,9 @@ function analyzeLogs() {
   const e2 = new DetectionEngine({});
   evs.forEach(e => e2.ingest(e));
   $('#logStat').textContent = `${evs.length} baris dikenali · ${e2.alerts.length} temuan · ${e2.incidents.length} insiden`;
-  $('#logOut').innerHTML = e2.alerts.length ? e2.alerts.slice().reverse().map(alertHtml).join('') +
-    `<button class="btn" id="btnLogRep">📄 Unduh LAPSUS dari hasil analisis</button>` : '<div class="empty">Tidak ditemukan ancaman pada log ini.</div>';
+  aiLogCtx = e2.alerts.map(a => `- ${wib(a.ts)} [${SEV_LABEL[SEV[a.sev]]}] ${a.title}. ${a.detail} (MITRE: ${a.techs.join(', ') || '-'})`).join('\n');
+  $('#logOut').innerHTML = e2.alerts.length ? `<div class="row" style="margin:0 0 4px"><button class="btn ai" id="btnAILog">🧠 Jelaskan dengan AI</button><button class="btn" id="btnLogRep">📄 Unduh LAPSUS dari hasil analisis</button></div><div id="aiLogOut"></div>` +
+    e2.alerts.slice().reverse().map(alertHtml).join('') : '<div class="empty">Tidak ditemukan ancaman pada log ini.</div>';
   const b = $('#btnLogRep'); if (b) b.onclick = () => download('LAPSUS-analisis-log.txt', e2.incidents.map(i => buildReport(i, e2)).join('\n\n' + '='.repeat(70) + '\n\n'));
 }
 
