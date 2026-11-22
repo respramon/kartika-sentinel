@@ -7,6 +7,17 @@ Purwarupa untuk **Kartika Cyber Hackathon 2026**, kategori **Penangkalan**, oleh
 
 > Satu mini-PC + satu port mirror = SOC mini untuk satuan TNI AD: mendeteksi serangan pada jaringan staf **dan** perangkat fisik markas (genset, CCTV, kontrol akses, radio IP), memetakan ke MITRE ATT&CK, memberi langkah respons, dan menulis Laporan Khusus (LAPSUS) insiden secara otomatis — tanpa internet, tanpa cloud asing.
 
+![Dasbor KARTIKA-SENTINEL](docs/screenshots/1-dasbor.png)
+
+## Tangkapan layar
+| | |
+|---|---|
+| ![Dasbor](docs/screenshots/1-dasbor.png)<br>**Dasbor**: peta jaringan IT + OT/IoT, KPI, umpan alert waktu nyata | ![Insiden](docs/screenshots/2-insiden.png)<br>**Insiden**: korelasi alert, kill chain, skor risiko, respons SOAR |
+| ![MITRE ATT&CK](docs/screenshots/3-mitre.png)<br>**MITRE ATT&CK**: heatmap teknik Enterprise + ICS | ![Aset](docs/screenshots/4-aset.png)<br>**Aset**: inventaris, kerentanan, risiko per aset |
+| ![LAPSUS](docs/screenshots/5-laporan.png)<br>**LAPSUS otomatis**: laporan khusus format naskah dinas + STIX 2.1 | ![Analisis log](docs/screenshots/6-log.png)<br>**Analisis log**: unggah `auth.log`/CSV sensor, dianalisis lokal |
+| ![AI analisis insiden](docs/screenshots/9-ai-analisis.png)<br>**AI generatif (opsional)**: analisis insiden oleh LLM lokal (Ollama) | ![Tanya SENTINEL](docs/screenshots/10-ai-chat.png)<br>**Chat "Tanya SENTINEL"**: tanya-jawab situasi keamanan |
+| ![Arsitektur](docs/screenshots/7-arsitektur.png)<br>**Arsitektur**: enam lapis, dari sensor hingga pelaporan | |
+
 ## Masalah
 1. Markas modern bergantung pada sistem **OT/IoT** (PLC genset, UPS, CCTV, akses gerbang, radio-over-IP) yang jarang dipantau, padahal serangan ke sistem ini berdampak **fisik** (catu daya padam, pengawasan buta).
 2. Tidak setiap satuan memiliki personel SOC; deteksi tanpa interpretasi dan **pelaporan berjenjang yang cepat** tidak berguna.
